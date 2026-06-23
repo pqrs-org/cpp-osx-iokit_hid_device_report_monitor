@@ -1,7 +1,7 @@
 #include <boost/ut.hpp>
 #include <pqrs/osx/iokit_hid_device_report_monitor.hpp>
 
-int main(void) {
+int main() {
   using namespace boost::ut;
   using namespace boost::ut::literals;
 
@@ -14,9 +14,14 @@ int main(void) {
                                                                                 run_loop_thread,
                                                                                 nullptr);
 
+    expect(!monitor->seized());
+
     monitor->async_start(kIOHIDOptionsTypeNone,
                          std::chrono::milliseconds(3000));
+    expect(!monitor->seized());
+
     monitor->async_stop();
+    expect(!monitor->seized());
 
     monitor = nullptr;
 
