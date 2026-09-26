@@ -25,6 +25,10 @@
 
 namespace pqrs::osx {
 class iokit_hid_device_report_monitor final : public dispatcher::extra::dispatcher_client {
+private:
+  // Keep the guard first so member initialization failures also detach.
+  pqrs::dispatcher::extra::dispatcher_client_constructor_exception_guard dispatcher_client_constructor_exception_guard_{*this};
+
 public:
   // Signals (invoked from the dispatcher thread)
 
@@ -46,40 +50,43 @@ public:
       : dispatcher_client(weak_dispatcher),
         run_loop_thread_(run_loop_thread),
         hid_device_(device),
-        open_timer_(*this),
-        last_open_error_(kIOReturnSuccess) {
-    //
-    // Resize report_buffer_
-    //
+        last_open_error_(kIOReturnSuccess),
+        open_timer_(*this) {
+    dispatcher_client_constructor_exception_guard_.initialize(
+        [&] {
+          //
+          // Resize report_buffer_
+          //
 
-    size_t buffer_size = 32; // use this provisional value if we cannot get max input report size from device.
-    if (auto size = hid_device_.find_max_input_report_size()) {
-      buffer_size = static_cast<size_t>(*size);
-    }
+          size_t buffer_size = 32; // use this provisional value if we cannot get max input report size from device.
+          if (auto size = hid_device_.find_max_input_report_size()) {
+            buffer_size = static_cast<size_t>(*size);
+          }
 
-    report_buffer_.resize(buffer_size);
+          report_buffer_.resize(buffer_size);
 
-    //
-    // Schedule device
-    //
+          //
+          // Schedule device
+          //
 
-    auto wait = make_thread_wait();
+          auto wait = make_thread_wait();
 
-    run_loop_thread_->enqueue(^{
-      if (auto d = hid_device_.get_device()) {
-        IOHIDDeviceRegisterRemovalCallback(*d,
-                                           static_device_removal_callback,
-                                           this);
+          run_loop_thread_->enqueue(^{
+            if (auto d = hid_device_.get_device()) {
+              IOHIDDeviceRegisterRemovalCallback(*d,
+                                                 static_device_removal_callback,
+                                                 this);
 
-        IOHIDDeviceScheduleWithRunLoop(*d,
-                                       run_loop_thread_->get_run_loop(),
-                                       kCFRunLoopCommonModes);
-      }
+              IOHIDDeviceScheduleWithRunLoop(*d,
+                                             run_loop_thread_->get_run_loop(),
+                                             kCFRunLoopCommonModes);
+            }
 
-      wait->notify();
-    });
+            wait->notify();
+          });
 
-    wait->wait_notice();
+          wait->wait_notice();
+        });
   }
 
   ~iokit_hid_device_report_monitor() override {
@@ -350,11 +357,12 @@ private:
   not_null_shared_ptr_t<cf::run_loop_thread> run_loop_thread_;
 
   iokit_hid_device hid_device_;
-  dispatcher::extra::timer open_timer_;
   std::optional<IOOptionBits> requested_open_options_;
   std::optional<IOOptionBits> current_open_options_;
   mutable std::mutex open_options_mutex_;
   iokit_return last_open_error_;
   std::vector<uint8_t> report_buffer_;
+  // Construct after potentially throwing members; destruction requires detach.
+  dispatcher::extra::timer open_timer_;
 };
 } // namespace pqrs::osx
