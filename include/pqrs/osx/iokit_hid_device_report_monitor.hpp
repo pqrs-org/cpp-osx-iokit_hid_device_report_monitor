@@ -50,7 +50,6 @@ public:
       : dispatcher_client(weak_dispatcher),
         run_loop_thread_(run_loop_thread),
         hid_device_(device),
-        last_open_error_(kIOReturnSuccess),
         open_timer_(*this) {
     dispatcher_client_constructor_exception_guard_.initialize(
         [&] {
@@ -360,8 +359,9 @@ private:
   std::optional<IOOptionBits> requested_open_options_;
   std::optional<IOOptionBits> current_open_options_;
   mutable std::mutex open_options_mutex_;
-  iokit_return last_open_error_;
+  iokit_return last_open_error_{kIOReturnSuccess};
   std::vector<uint8_t> report_buffer_;
+
   // Construct after potentially throwing members; destruction requires detach.
   dispatcher::extra::timer open_timer_;
 };
