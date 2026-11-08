@@ -2,6 +2,7 @@
 #include <IOKit/hid/IOHIDUsageTables.h>
 #include <IOKit/hid/IOHIDValue.h>
 #include <csignal>
+#include <pqrs/osx/autorelease_pool.hpp>
 #include <pqrs/osx/iokit_hid_device_report_monitor.hpp>
 #include <pqrs/osx/iokit_hid_manager.hpp>
 
@@ -15,8 +16,12 @@ int main() {
   });
 
   auto time_source = std::make_shared<pqrs::dispatcher::hardware_time_source>();
-  auto dispatcher = std::make_shared<pqrs::dispatcher::dispatcher>(time_source);
-  auto run_loop_thread = std::make_shared<pqrs::cf::run_loop_thread>();
+  auto dispatcher = std::make_shared<pqrs::dispatcher::dispatcher>(
+      time_source,
+      pqrs::osx::autorelease_pool::execute_with_autorelease_pool);
+  auto run_loop_thread = std::make_shared<pqrs::cf::run_loop_thread>(
+      pqrs::cf::run_loop_thread::failure_policy::abort,
+      pqrs::osx::autorelease_pool::execute_with_autorelease_pool);
 
   std::unordered_map<pqrs::osx::iokit_registry_entry_id::value_t, pqrs::not_null_shared_ptr_t<pqrs::osx::iokit_hid_device_report_monitor>> monitors;
 
